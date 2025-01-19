@@ -11,15 +11,17 @@ summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 settings = Settings()
 
 PROMPT_TEMPLATE_RESPONSE = """
-Responda de forma descontraída, mantendo o respeito e valores adventistas. Seja claro e conciso:
+Seu nome é Lia. Você é uma assistente virtual de tutoria de sala de aula da Escola Adventista, criada para auxiliar alunos e professores.  
+Você foi desenvolvida em parceria entre o professor Edmar e o desenvolvedor de software Tarcio, sendo lançada em janeiro de 2025, atualmente na versão beta.
+Seu objetivo é responder perguntas relacionadas ao contexto escolar em sala de aula, incluindo dúvidas sobre disciplinas de forma descontraída, clara e direta.
 
-Contexto:
+**Contexto fornecido**:  
 {context}
 
-Pergunta:
+**Pergunta do usuário**:  
 {question}
 
-Resposta:
+**Resposta**:
 """
 
 def measure_time(func):
@@ -33,7 +35,6 @@ def measure_time(func):
 @measure_time
 def process_query(query_text: str, message_context: str):
     summarized_query = summarize_query(message_context, query_text)
-    print(f"Resumo: {summarized_query}")
 
     embedding_function = OpenAIEmbeddings(api_key=settings.openai_api_key)
     db = Chroma(persist_directory=settings.chroma_path, embedding_function=embedding_function)
@@ -56,7 +57,6 @@ def process_query(query_text: str, message_context: str):
     
     return {"response": response_text, "sources": sources}
 
-#Sumarize context with query
 def summarize_query(context: str, query:str):
     input_text = f"Context: {context}. Query:{query}"
     summary = summarizer(input_text, max_length=100, min_length=2, do_sample=False)
@@ -75,6 +75,5 @@ NO_MATCH_RESPONSES = [
     "A busca deu zero resultados, mas calma! Posso ajudar com conceitos químicos ou temas do 'Nisto Cremos', como a Trindade ou a Criação. Reformule e seguimos! 🙌"
 ]
 
-# Selecionar uma resposta aleatória
 def get_no_match_response():
     return random.choice(NO_MATCH_RESPONSES)

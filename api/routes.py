@@ -1,14 +1,17 @@
 from fastapi import APIRouter, HTTPException
-from models.request_models import QueryRequest
-from models.response_models import QueryResponse
+from models.request_models import QueryRequest,VoiceQueryRequest
+from models.response_models import TextQueryResponse, VoiceQueryResponse
 from services.query_service import process_query
+from services.voice_query_service import voice_query
 
-# Inicializar o roteador
 router = APIRouter()
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query", response_model=TextQueryResponse)
 def query_endpoint(request: QueryRequest):
     response = process_query(request.query_text, request.message_context)
-    if not response["response"]:
-        raise HTTPException(status_code=404, detail="No matching results found.")
+    return response
+
+@router.post("/voiceQuery", response_model=VoiceQueryResponse)
+def query_endpoint(request: VoiceQueryRequest):
+    response = voice_query(request.audio_url, request.audio_auth, request.message_context)
     return response

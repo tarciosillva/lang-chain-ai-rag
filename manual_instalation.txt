@@ -6,10 +6,13 @@
 
 4. source venv/bin/activate
 
-5. pip install -r requirements.txt
+5. sudo apt update
+   sudo apt install ffmpeg
 
-6. python create_database.py
+6. pip install -r requirements.txt
 
-7. Sair do venv: deactivate
+7. python create_database.py
+
+8. Sair do venv: deactivate
  
-8. docker compose up -d
+9. docker compose up -d
