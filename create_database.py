@@ -1,95 +1,105 @@
-from langchain_community.document_loaders import DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-import openai
-from dotenv import load_dotenv
-import os
+import logging
 import shutil
+from pathlib import Path
+from typing import List
+
 import nltk
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Configurar o caminho correto para o nltk_data
-nltk.download("averaged_perceptron_tagger_eng")
+from config.settings import Settings
 
-# Carregar as variáveis de ambiente (supondo que você tenha um arquivo .env)
-load_dotenv()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
-# Definir a chave da API do OpenAI a partir do .env
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+logger = logging.getLogger(__name__)
 
-# Caminhos para os dados e a base de dados Chroma
-CHROMA_PATH = "chroma"
-DATA_PATH = "data/books"
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt", quiet=True)
 
+try:
+    nltk.data.find("taggers/averaged_perceptron_tagger")
+except LookupError:
+    nltk.download("averaged_perceptron_tagger", quiet=True)
 
-def main():
-    """Função principal para gerar o banco de dados de vetores."""
-    generate_data_store()
+settings = Settings()
 
-
-def generate_data_store():
-    """Carrega documentos, divide em chunks e os salva no banco de dados Chroma."""
-    documents = load_documents()
-    chunks = split_text(documents)
-    save_to_chroma(chunks)
+CHROMA_PATH = Path(settings.chroma_path)
+DATA_PATH = Path("data/books")
 
 
-def load_documents():
-    """
-    Carrega documentos do diretório especificado usando o DirectoryLoader.
-    Certifique-se de que os arquivos estão no formato correto.
-    """
-    loader = DirectoryLoader(DATA_PATH, glob="*.pdf")
+def load_documents() -> List[Document]:
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(f"Data directory not found: {DATA_PATH}")
+    
+    loader = DirectoryLoader(
+        str(DATA_PATH),
+        glob="*.pdf",
+        show_progress=True
+    )
     documents = loader.load()
+    logger.info(f"Loaded {len(documents)} documents")
     return documents
 
 
-def split_text(documents: list):
-    """
-    Divide os documentos em chunks menores usando o RecursiveCharacterTextSplitter.
-    
-    Args:
-        documents (list[Document]): Lista de documentos a serem divididos.
-    
-    Returns:
-        list[Document]: Lista de chunks dos documentos.
-    """
+def split_text(documents: List[Document]) -> List[Document]:
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=300,
         chunk_overlap=100,
         length_function=len,
         add_start_index=True,
+        separators=["\n\n", "\n", ". ", " ", ""]
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
-
-    # Imprime detalhes de um chunk para verificação
-    if len(chunks) > 10:
-        document = chunks[10]
-        print(document.page_content)
-        print(document.metadata)
-
+    logger.info(f"Split {len(documents)} documents into {len(chunks)} chunks")
+    
+    if chunks:
+        logger.debug(f"Sample chunk metadata: {chunks[0].metadata}")
+    
     return chunks
 
 
-def save_to_chroma(chunks: list):
-    """
-    Salva os chunks no banco de dados Chroma.
-    
-    Args:
-        chunks (list[Document]): Lista de chunks a serem salvos.
-    """
-    # Limpa o banco de dados Chroma existente, se houver.
-    if os.path.exists(CHROMA_PATH):
+def save_to_chroma(chunks: List[Document]) -> None:
+    if CHROMA_PATH.exists():
+        logger.info(f"Removing existing ChromaDB at {CHROMA_PATH}")
         shutil.rmtree(CHROMA_PATH)
-
-    # Cria um novo banco de dados Chroma a partir dos documentos.
+    
+    embedding_function = OpenAIEmbeddings(api_key=settings.openai_api_key)
+    
     db = Chroma.from_documents(
-        chunks, OpenAIEmbeddings(), persist_directory=CHROMA_PATH
+        documents=chunks,
+        embedding=embedding_function,
+        persist_directory=str(CHROMA_PATH)
     )
+    
     db.persist()
-    print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
+    logger.info(f"Saved {len(chunks)} chunks to {CHROMA_PATH}")
+
+
+def generate_data_store() -> None:
+    try:
+        documents = load_documents()
+        if not documents:
+            logger.warning("No documents found to process")
+            return
+        
+        chunks = split_text(documents)
+        save_to_chroma(chunks)
+        logger.info("Data store generation completed successfully")
+    except Exception as e:
+        logger.error(f"Error generating data store: {e}", exc_info=True)
+        raise
+
+
+def main() -> None:
+    generate_data_store()
 
 
 if __name__ == "__main__":

@@ -4,15 +4,17 @@
 
 3.No diretório do repositório, crie o ambiente virtual usando o comando: python3 -m venv venv
 
-4. source venv/bin/activate
+4. Criar arquivo de configuração de acesso do gcp
 
-5. sudo apt update
+5. source venv/bin/activate
+
+6. sudo apt update
    sudo apt install ffmpeg
 
-6. pip install -r requirements.txt
+7. pip install -r requirements.txt
 
-7. python create_database.py
+8. python create_database.py
 
-8. Sair do venv: deactivate
+9. Sair do venv: deactivate
  
-9. docker compose up -d
+10. docker compose up -d
